@@ -1,0 +1,28 @@
+package <#BASEPACKAGE#>.datatypes.gen;
+
+/*****************************************
+* This is a generated class, please don't modify manually
+******************************************/
+
+import java.sql.*;
+
+import javax.xml.bind.annotation.XmlRootElement;
+
+import org.json.JSONObject;
+
+@XmlRootElement
+public class <#CLASSNAME#> {
+	
+<#op#>
+
+    public static <#CLASSNAME#> fromJSON(JSONObject jObj) {
+		<#JSONOBJECT_TO_BEAN#>
+		return bean;
+    }
+    
+    public JSONObject toJSON() {
+    	JSONObject jObj = new JSONObject();
+    	<#BEAN_TO_JSONOBJECT#>
+    	return jObj;
+    }    
+}

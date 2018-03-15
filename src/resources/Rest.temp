@@ -1,0 +1,203 @@
+package <#BASEPACKAGE#>.rest.gen;
+
+/*****************************************
+* This is a generated class, please don't modify manually
+******************************************/
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+
+import java.sql.SQLException;
+
+import javax.servlet.http.HttpServletRequest;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.SecurityContext;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import <#BASEPACKAGE#>.auth.AuthConstants;
+
+import <#BASEPACKAGE#>.dao.gen.<#CLASSNAME#>BaseDAO;
+
+import <#BASEPACKAGE#>.datatypes.gen.SfUser;
+import <#BASEPACKAGE#>.datatypes.MutableBoolean;
+import <#BASEPACKAGE#>.datatypes.gen.<#CLASSNAME#>;
+
+import <#BASEPACKAGE#>.rest.BaseREST;
+import <#BASEPACKAGE#>.rest.util.UserPrincipal;
+
+<#IF NO_CUSTOM_REST#>
+@Path("/<#URLNAME#>")<#ENDIF#>
+public class <#CLASSNAME#>BaseREST extends BaseREST {
+
+<#IF NO_CUSTOM_REST#>
+	@POST 
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)<#ENDIF#>	
+	public Response create(<#CLASSNAME#> message,@Context final SecurityContext securityContext, @Context HttpServletRequest servletRequest) {
+		SfUserPrincipal principal = (SfUserPrincipal)securityContext.getUserPrincipal();
+	    try {
+<#IF HAS_CREATEDBY#>
+			if(message.getCreatedBy()==null){				
+				message.setCreatedBy(principal.getUserId());
+			}<#ENDIF#>	    
+	    	<#CLASSNAME#>BaseDAO dao = new <#CLASSNAME#>BaseDAO();
+	    	String id = dao.create(message);
+	    	JSONObject notice = new JSONObject();
+	    	notice.put("id", id);
+	    	log("<#CLASSNAME#> create", servletRequest, principal, this.getClass().getName(), getBody(servletRequest));
+			return Response.ok(notice.toString()).build();
+		} catch(SQLException sqlex){
+			log(AuthConstants.LOG_WARNING, "<#CLASSNAME#> create failed with fk violation.", servletRequest, principal, this.getClass().getName(), sqlex.getMessage(),sqlex);	
+			return Response.status(Status.BAD_REQUEST).build();		
+	    } catch(Exception exc){
+	    	log(AuthConstants.LOG_ERROR, "<#CLASSNAME#> create failed.", servletRequest, principal, this.getClass().getName(), exc.getMessage(),exc);
+	    	return Response.serverError().build();
+	    }
+	}
+
+<#IF NO_CUSTOM_REST#>	
+	@GET
+	@Path("{id}")
+	@Produces(MediaType.APPLICATION_JSON)<#ENDIF#>
+	public Response read(
+			@PathParam("id") String id,
+			@Context final SecurityContext securityContext,
+			@Context HttpServletRequest servletRequest)
+	{
+		SfUserPrincipal principal = (SfUserPrincipal)securityContext.getUserPrincipal();
+	    try {
+	    	<#CLASSNAME#>BaseDAO dao = new <#CLASSNAME#>BaseDAO();
+
+			<#CLASSNAME#> bean = dao.read(id);
+			log("<#CLASSNAME#> read", servletRequest, principal, this.getClass().getName(), "id:"+id);
+			if(bean!=null) {
+				JSONObject obj = new JSONObject(bean);
+				return Response.ok(obj.toString(), MediaType.APPLICATION_JSON).build();
+			} else {
+				return Response.status(Status.NOT_FOUND).build();
+			}
+	    } catch(Exception exc){
+	    	log(AuthConstants.LOG_ERROR, "<#CLASSNAME#> read failed.", servletRequest, principal, this.getClass().getName(), exc.getMessage(),exc);
+	    	return Response.serverError().build();
+	    }	
+	}
+	
+<#IF NO_CUSTOM_REST#>	
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)<#ENDIF#>
+	public Response list(
+			@Context final SecurityContext securityContext,
+			@DefaultValue("1000") @QueryParam("top") int top,
+			@DefaultValue("0")@QueryParam("offset") int offset,		
+			@DefaultValue("0")@QueryParam("timestamp") long timestamp,	 
+			@Context HttpServletRequest servletRequest)
+	{
+		SfUserPrincipal principal = (SfUserPrincipal)securityContext.getUserPrincipal();
+	    try {
+	    	String orgId = principal.getOrganizationId();
+	    	
+    		<#CLASSNAME#>BaseDAO dao = new <#CLASSNAME#>BaseDAO();    
+    		MutableBoolean hasMore = new MutableBoolean();
+			JSONArray array = dao.list(orgId, top, offset, hasMore,timestamp>0?timestamp:System.currentTimeMillis());
+		    
+		    log("<#CLASSNAME#> list", servletRequest, principal, this.getClass().getName(), null);
+		    
+			ResponseBuilder builder = Response.ok(array.toString(), MediaType.APPLICATION_JSON);	
+			builder.header("hasMore", hasMore.getValue());
+			return builder.build();		    	
+	    } catch(Exception exc){
+	    	log(AuthConstants.LOG_ERROR, "<#CLASSNAME#> list failed.", servletRequest, principal, this.getClass().getName(), exc.getMessage(),exc);
+	    	return Response.serverError().build();
+	    }		
+	}	
+	
+	protected Set<String> validUpdateFields = new HashSet<String>(Arrays.asList(<#COMMA_SEPARATED_QUOTED_FIELDS#>));
+	
+	protected Map<String,Object> BeantoMap(<#CLASSNAME#> bean) {
+		Map<String,Object> map = new HashMap<String,Object>();
+		Object value;
+<#LOAD_MAP_WITH_NONNULL_FIELDS#>		
+		return map;
+	}	
+
+<#IF NO_CUSTOM_REST#>	
+	@PUT
+	@Path("{id}")	
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)<#ENDIF#>	
+	public Response update(<#CLASSNAME#> bean, @PathParam("id") String id,
+				@DefaultValue("") @QueryParam("spaceId") String spaceId,
+				@DefaultValue("") @QueryParam("organizationId") String organizationId,	 
+				@Context final SecurityContext securityContext, 
+				@Context HttpServletRequest servletRequest) {
+		SfUserPrincipal principal = (SfUserPrincipal)securityContext.getUserPrincipal();		
+		try {	
+			SfUser modifiedBy = principal.getSfUser();
+<#IF HAS_MODIFIEDBY#>
+			if(bean.getModifiedBy()==null){
+				bean.setModifiedBy(modifiedBy.getId());
+				bean.setModifiedByName(modifiedBy.getName());
+			}else{
+				modifiedBy = new SfUser();
+				modifiedBy.setId(bean.getModifiedBy());
+				modifiedBy.setName(bean.getModifiedByName());
+			}<#ENDIF#>		
+	    	<#CLASSNAME#>BaseDAO dao = new <#CLASSNAME#>BaseDAO();
+	    	Map<String,Object> updates = BeantoMap(bean);
+	    	int affected = dao.update(id, updates, modifiedBy, spaceId, organizationId);
+	    	JSONObject notice = new JSONObject();
+	    	notice.put("affected", affected);
+			log("<#CLASSNAME#> update", servletRequest, principal, this.getClass().getName(), getBody(servletRequest));
+			return Response.ok(notice.toString()).build();
+		} catch(Exception exc){
+			log(AuthConstants.LOG_ERROR, "<#CLASSNAME#> update failed.", servletRequest, principal, this.getClass().getName(), exc.getMessage(),exc);
+			return Response.serverError().build();
+		}		
+	}
+
+<#IF NO_CUSTOM_REST#>	
+	@DELETE
+	@Path("{id}")
+	@Produces(MediaType.APPLICATION_JSON) <#ENDIF#>
+	public Response delete(@PathParam("id") String id, 
+				@DefaultValue("") @QueryParam("spaceId") String spaceId,
+				@DefaultValue("") @QueryParam("organizationId") String organizationId,	
+				@Context final SecurityContext securityContext,
+				@Context HttpServletRequest servletRequest) {
+				
+		SfUserPrincipal principal = (SfUserPrincipal)securityContext.getUserPrincipal();		
+		try {
+	    	<#CLASSNAME#>BaseDAO dao = new <#CLASSNAME#>BaseDAO();
+	    	int affected = dao.delete(id, ((SfUserPrincipal)securityContext.getUserPrincipal()).getUserId(), spaceId, organizationId);
+	    	JSONObject notice = new JSONObject();
+	    	notice.put("affected", affected);	    	
+			log(AuthConstants.LOG_WARNING, "<#CLASSNAME#> delete", servletRequest, principal, this.getClass().getName(), "id:"+id, null);	    	
+			return Response.ok(notice.toString()).build();
+		} catch(Exception exc){
+			log(AuthConstants.LOG_ERROR, "<#CLASSNAME#> delete failed.", servletRequest, principal, this.getClass().getName(), exc.getMessage(),exc);
+			return Response.serverError().build();
+		}
+	}	
+}

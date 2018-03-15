@@ -1,0 +1,390 @@
+package com.orangeloops.snowflake.dao.gen;
+
+/*****************************************
+* This is a generated class, please don't modify manually
+******************************************/
+
+import java.sql.*;
+
+import java.util.Iterator;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.apache.commons.codec.digest.DigestUtils;
+
+import <#BASEPACKAGE#>.dao.DAO;
+import <#BASEPACKAGE#>.dao.PostgresqlBaseDAO;
+
+import <#BASEPACKAGE#>.datatypes.MutableBoolean;
+
+import <#BASEPACKAGE#>.util.ResourceHelper;
+import <#BASEPACKAGE#>.util.SFUUID;
+
+import <#BASEPACKAGE#>.datatypes.gen.SfUser;
+import <#BASEPACKAGE#>.datatypes.gen.TransactionLog;
+import <#BASEPACKAGE#>.datatypes.gen.<#CLASSNAME#>;
+
+public class <#CLASSNAME#>BaseDAO extends PostgresqlBaseDAO implements DAO<<#CLASSNAME#>,String>{
+
+	protected String getInsertStatement() {
+		String statement = "INSERT INTO <#TABLENAME#>"
+			+ "(<#COMMA_SEPARATED_COLUMNS#>) " + "VALUES"
+			+ "(<#COMMA_SEPARATED_QM#>)";
+		return statement;
+	}
+	
+	protected String getSelect() {
+		return "SELECT <#COMMA_SEPARATED_COLUMNS#> FROM <#TABLENAME#> ";
+	}
+	
+	protected String getOrderBy() {
+		return " <#ORDER_BY_SQL#> LIMIT ? OFFSET ?";
+	}
+	
+	protected String getWhereById() {
+		return " WHERE <#PRIMARY_KEY#>=? <#WHERE_FILTERS#> ";
+	}
+	
+	protected String getReadStatement() {
+		String statement = getSelect() + getWhereById();
+		return statement;
+	}
+	
+	protected String getListStatement(String whereExpr) {
+		String statement = getSelect() + whereExpr + getOrderBy();
+		return statement;		
+	}	
+	
+	protected <#CLASSNAME#> populateBean(ResultSet rs) throws SQLException {
+		
+		<#CLASSNAME#> bean = new <#CLASSNAME#>();
+		
+<#POPULATE_BEAN_FROM_RESULTSET#>
+		return bean;
+	}	
+	
+	protected PreparedStatement populatePreparedStatementForInsert(String id, PreparedStatement preparedStatement, <#CLASSNAME#> bean) throws SQLException {
+		
+		<#PREPARE_STATEMENT_PK#>
+<#PREPARE_STATEMENT#>
+		
+		return preparedStatement;
+	}
+	
+<#IF TRANSACT_ENTITY#>	
+	private TransactionLog getDeleteTransactionBean(String id, String userId, String spaceId, String orgId) {
+		TransactionLog tlog = new TransactionLog();
+		tlog.setId(SFUUID.shortUUID());
+		tlog.setResourceId(id);
+		tlog.setUserId(userId);
+		tlog.setOperationType(OPERATION_DELETE);
+		tlog.setResourceType(ResourceHelper.getResourceTypeCode("<#URLNAME#>"));		
+		tlog.setSpaceId(spaceId);	
+		tlog.setOrganizationId(orgId);
+		return tlog;	
+	}
+	
+	private TransactionLog getUpdateTransactionBean(String resourceId, String modifiedBy, String spaceId, String organizationId, Map<String,Object> updates) {
+		TransactionLog tlog = new TransactionLog();
+		tlog.setId(SFUUID.shortUUID());
+		tlog.setResourceId(resourceId);
+		tlog.setOperationType(OPERATION_UPDATE);
+		tlog.setResourceType(ResourceHelper.getResourceTypeCode("<#URLNAME#>"));
+		tlog.setOrganizationId(organizationId);
+		String beanAsString = (new JSONObject(updates)).toString();
+		tlog.setData(beanAsString);
+		tlog.setUserId(modifiedBy);
+		tlog.setSpaceId(spaceId);
+		//tlog.setFingerprint(DigestUtils.shaHex(beanAsString));
+		return tlog;
+	}	
+	
+	private TransactionLog getInsertTransactionBean(<#CLASSNAME#> bean) {
+		TransactionLog tlog = new TransactionLog();
+		tlog.setId(SFUUID.shortUUID());
+		tlog.setResourceId(bean.getId());
+		tlog.setOperationType(OPERATION_INSERT);
+		tlog.setResourceType(ResourceHelper.getResourceTypeCode("<#URLNAME#>"));
+		tlog.setOrganizationId(<#ORG_ID_GETTER#>);
+		String beanAsString = (new JSONObject(bean)).toString();
+		tlog.setData(beanAsString);
+		tlog.setUserId(<#USER_ID_GETTER#>);
+		tlog.setSpaceId(<#SPACE_ID_GETTER#>);
+		tlog.setFingerprint(DigestUtils.shaHex(beanAsString));
+		return tlog;
+	}	
+<#ENDIF#>
+
+	public String create(<#CLASSNAME#> bean) throws SQLException {
+		 
+		Connection dbConnection = null;
+		PreparedStatement preparedStatement = null;
+ 
+		String insertTableSQL = getInsertStatement();
+			
+		<#VAR_ID#>
+		try {
+			dbConnection = getDBConnection();
+			dbConnection.setAutoCommit(false);
+			
+			preparedStatement = dbConnection.prepareStatement(insertTableSQL);
+
+			preparedStatement = populatePreparedStatementForInsert(id, preparedStatement, bean);
+			
+			// execute insert SQL statement
+			preparedStatement.executeUpdate();
+			
+			//<#LOG_INSERT#>
+			
+			dbConnection.commit();			
+		} catch (SQLException sqlx) {
+			if(dbConnection!=null) {
+				dbConnection.rollback();
+			}
+			throw sqlx;
+		} finally {
+ 
+			if (preparedStatement != null) {
+				preparedStatement.close();
+			}
+ 
+			releaseConnection(dbConnection);
+		}
+		return id;
+	}
+	
+	public <#CLASSNAME#> read(String id) throws SQLException {
+		Connection dbConnection = null;
+		PreparedStatement preparedStatement = null;		
+		<#CLASSNAME#> bean = new <#CLASSNAME#>();
+		
+	    try 
+	    {
+	      dbConnection = getDBConnection();
+	      String querySQL = getReadStatement();
+	      preparedStatement = dbConnection.prepareStatement(querySQL);
+		  preparedStatement.setString(1, id);
+		  ResultSet rs = preparedStatement.executeQuery();
+	      if ( rs.next() )
+	      { 
+			bean = populateBean(rs);
+	      } else {
+	      	bean = null;
+	      }
+	      rs.close();
+	      
+		} finally {
+			if (preparedStatement != null) {
+				preparedStatement.close();
+			}
+			releaseConnection(dbConnection);
+		}	    
+	    return bean;		
+	}
+	
+	public JSONArray list(String orgId) throws SQLException {
+		return list(orgId, 1000, 0, null, null,System.currentTimeMillis());
+	}		
+
+	public JSONArray list(String orgId, int limit, int offset, MutableBoolean hasMore, long deletedSince) throws SQLException {
+		return list(orgId, limit, offset, null, hasMore, deletedSince);
+	}
+	
+	public JSONArray list(String orgId, int limit, int offset, Long offsetDate, MutableBoolean hasMore, long deletedSince) throws SQLException {
+		Connection dbConnection = null;
+		PreparedStatement preparedStatement = null;		
+		JSONArray list = new JSONArray();
+		
+	    try 
+	    {
+	      dbConnection = getDBConnection();
+	      String whereExpr = offsetDate!=null ? "WHERE organization_id=? AND created_date<=? <#WHERE_FILTERS_SINCE#> " : "WHERE organization_id=? <#WHERE_FILTERS_SINCE#> ";
+	      String querySQL = getListStatement(whereExpr);
+	      int paramIndex = 1;
+	      preparedStatement = dbConnection.prepareStatement(querySQL);
+		  preparedStatement.setString(paramIndex++, orgId);
+		  if(offsetDate!=null) {
+		  	preparedStatement.setLong(paramIndex++, offsetDate);
+		  }
+		  preparedStatement.setLong(paramIndex++, deletedSince);
+		  
+		  preparedStatement.setInt(paramIndex++, limit + 1);
+		  preparedStatement.setInt(paramIndex++, offset);
+		  
+		  ResultSet rs = preparedStatement.executeQuery();
+		  
+		  <#CLASSNAME#> bean = null;
+		  int retrieved = 0;
+	      while ( retrieved < limit && rs.next())
+	      {
+			bean = populateBean(rs);
+
+			list.put(new JSONObject(bean));
+			retrieved++;
+	      }
+	      if(hasMore!= null){
+	    	  hasMore.setValue(rs.next());
+	      }    
+	      rs.close();
+	      
+		} finally {
+			if (preparedStatement != null) {
+				preparedStatement.close();
+			}
+		
+			releaseConnection(dbConnection);
+		}	    
+	    return list;		
+	}		 
+	
+<#BEGIN_CUSTOM_LIST_TEMPLATE#>
+	public JSONArray <#LIST_METHOD_NAME#>(<#LIST_METHOD_PARAMS#>, int limit, int offset, MutableBoolean hasMore, long deletedSince) throws SQLException {
+		Connection dbConnection = null;
+		PreparedStatement preparedStatement = null;		
+		JSONArray list = new JSONArray();
+		
+	    try 
+	    {
+	      dbConnection = getDBConnection();
+	      String querySQL = getListStatement("WHERE <#LIST_WHERE_STATEMENT#> <#WHERE_FILTERS_SINCE#>");
+	      int paramIndex = 1;
+	      preparedStatement = dbConnection.prepareStatement(querySQL);
+
+<#LIST_SET_PARAMS#>
+		  
+		  preparedStatement.setInt(paramIndex++, limit + 1);
+		  preparedStatement.setInt(paramIndex++, offset);
+		  
+		  ResultSet rs = preparedStatement.executeQuery();
+		  
+		  <#CLASSNAME#> bean = null;
+		  int retrieved = 0;
+	      while ( retrieved < limit && rs.next() )
+	      {
+			bean = populateBean(rs);
+
+			list.put(new JSONObject(bean));
+			retrieved++;
+	      }
+	      
+	      if(hasMore!= null){
+	    	  hasMore.setValue(rs.next());
+	      }  
+	            
+	      rs.close();
+	      
+		} finally {
+			if (preparedStatement != null) {
+				preparedStatement.close();
+			}
+		
+			releaseConnection(dbConnection);
+		}	    
+	    return list;		
+	}	
+<#END_CUSTOM_LIST_TEMPLATE#>
+	
+	<#CUSTOM_LIST_METHODS#>
+	
+	@Override
+	protected Map<String,String> getDatabaseNamesMapping() {
+		Map<String,String> dbMapping = new HashMap<String,String>();
+<#FIELD_COLUMN_MAPPING#>
+		return dbMapping;
+	}	
+	
+	public int update(String id, Map<String,Object> updates, SfUser modifiedBy, String spaceId, String organizationId) throws SQLException{	
+		return this.update("<#TABLENAME#>", "<#PRIMARY_KEY#>", id, updates, <#HAS_MODIFIED_DATE_FIELD#>, modifiedBy, <#MUST_LOG_TRANSACTION#>);
+	}
+	
+	public int delete(String id, String deletedBy, String spaceId, String orgId) throws SQLException {
+		return <#DEFAULT_DELETE#>
+	}	
+
+<#IF SOFT_DELETE#>	
+	public int softDelete(String id, String userId, String spaceId, String orgId) throws SQLException {
+		Connection dbConnection = null;
+		PreparedStatement preparedStatement = null;
+		
+		int affected = 0;
+ 
+		String deleteSQL = "UPDATE <#TABLENAME#>"
+			+ " SET is_deleted=true, deleted_by=?, deleted_date=?, modified_date=? "
+			+ " WHERE <#PRIMARY_KEY#>=?";
+
+		try {
+			dbConnection = getDBConnection();
+			dbConnection.setAutoCommit(false);
+			
+			preparedStatement = dbConnection.prepareStatement(deleteSQL);
+			preparedStatement.setString(1, userId);
+			long timestamp = getCurrentTimeAsLong();
+			preparedStatement.setLong(2, timestamp);
+			preparedStatement.setLong(3, timestamp);
+			preparedStatement.setString(4, id);
+			
+			// execute insert SQL statement
+			affected = preparedStatement.executeUpdate();
+			
+			//<#LOG_DELETE#>
+
+			dbConnection.commit();			
+		} catch (SQLException sqlx) {
+			if(dbConnection!=null) {
+				dbConnection.rollback();
+			}
+			throw sqlx;
+		} finally {
+ 
+			if (preparedStatement != null) {
+				preparedStatement.close();
+			}
+ 
+			releaseConnection(dbConnection);
+		}
+		return affected;		
+	}	
+<#ENDIF#>	
+
+	public int hardDelete(String id, String userId, String spaceId, String orgId) throws SQLException {
+		Connection dbConnection = null;
+		PreparedStatement preparedStatement = null;
+		
+		int affected = 0;		
+ 
+		String deleteSQL = "DELETE FROM <#TABLENAME#>"
+			+ " WHERE <#PRIMARY_KEY#>=?";
+
+		try {
+			dbConnection = getDBConnection();
+			dbConnection.setAutoCommit(false);
+			
+			preparedStatement = dbConnection.prepareStatement(deleteSQL);
+			preparedStatement.setString(1, id);
+			
+			// execute insert SQL statement
+			affected = preparedStatement.executeUpdate();
+			
+			//<#LOG_DELETE#>
+
+			dbConnection.commit();			
+		} catch (SQLException sqlx) {
+			if(dbConnection!=null) {
+				dbConnection.rollback();
+			}
+			throw sqlx;
+		} finally {
+ 
+			if (preparedStatement != null) {
+				preparedStatement.close();
+			}
+ 
+			releaseConnection(dbConnection);
+		}	
+		return affected;			
+	}
+}
