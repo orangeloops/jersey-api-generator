@@ -18,3 +18,7 @@ Then invoke the main class passing the required database connection arguments:
 ```
 java -cp target/jersey-api-generator-1.0-jar-with-dependencies.jar com.orangeloops.apigen.Generator mydbhost dbName dbuser dbPass {target tableName}
 ```
+
+The table names to include in the generation can either be passed in the command line, or if it's more than one table, you can edit the src/resources/TablesToInclude.txt file to include all the table names separated by line breaks.
+
+Once the generation is completed, you will find the generated files in the output folder, and copy them to your project, or just edit the Generator class to modify the output folders to generate directly to your target project folders.
